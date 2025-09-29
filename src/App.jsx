@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, CheckSquare, Camera, AlertCircle, FileText, Clock, MapPin } from 'lucide-react';
+import { Calendar, CheckSquare, Camera, AlertCircle, FileText, Clock, MapPin, X } from 'lucide-react';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -14,7 +14,12 @@ const App = () => {
       scheduledDate: '2025-09-29',
       scheduledTime: '9:00 AM',
       attempts: 0,
-      lastUpdate: '2025-09-28'
+      lastUpdate: '2025-09-28',
+      contactName: 'Maria Garcia',
+      contactPhone: '(305) 555-0123',
+      hvhzZone: true,
+      floodZone: false,
+      documents: []
     },
     {
       id: 2,
@@ -26,7 +31,12 @@ const App = () => {
       scheduledDate: '2025-09-27',
       attempts: 1,
       failureReasons: ['Spacing of receptacles not to code', 'Work not according to plans'],
-      lastUpdate: '2025-09-27'
+      lastUpdate: '2025-09-27',
+      contactName: 'John Martinez',
+      contactPhone: '(305) 555-0456',
+      hvhzZone: true,
+      floodZone: true,
+      documents: []
     }
   ]);
 
@@ -43,6 +53,66 @@ const App = () => {
 
   const [checklistItems, setChecklistItems] = useState([]);
   const [generatingChecklist, setGeneratingChecklist] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+
+  const handleScheduleInspection = () => {
+    // Validate form
+    if (!newInspection.projectName || !newInspection.permitNumber || !newInspection.address || !newInspection.contactName || !newInspection.contactPhone) {
+      alert('Please fill out all required fields (marked with *)');
+      return;
+    }
+
+    // Create new project
+    const newProject = {
+      id: projects.length + 1,
+      ...newInspection,
+      status: 'Scheduled',
+      scheduledDate: new Date().toISOString().split('T')[0],
+      scheduledTime: '9:00 AM',
+      attempts: 0,
+      lastUpdate: new Date().toISOString().split('T')[0],
+      documents: []
+    };
+
+    // Add to projects
+    setProjects([...projects, newProject]);
+
+    // Show success message
+    setShowSuccessMessage(true);
+    setTimeout(() => setShowSuccessMessage(false), 3000);
+
+    // Clear form
+    setNewInspection({
+      address: '',
+      projectName: '',
+      permitNumber: '',
+      inspectionType: 'Electrical - Rough',
+      contactName: '',
+      contactPhone: '',
+      hvhzZone: true,
+      floodZone: false
+    });
+
+    // Clear checklist
+    setChecklistItems([]);
+
+    // Switch to dashboard
+    setTimeout(() => setActiveTab('dashboard'), 1500);
+  };
+
+  const handleFileUpload = (event, fileType) => {
+    const files = Array.from(event.target.files);
+    const newFiles = files.map(file => ({
+      id: Date.now() + Math.random(),
+      name: file.name,
+      type: fileType,
+      size: file.size,
+      uploadDate: new Date().toISOString()
+    }));
+    setUploadedFiles([...uploadedFiles, ...newFiles]);
+  };
 
   const generateElectricalChecklist = async (inspectionType) => {
     setGeneratingChecklist(true);
@@ -83,6 +153,12 @@ const App = () => {
         { id: 6, item: 'Confirm meter base installation and sealing', checked: false, critical: false },
         { id: 7, item: 'Verify weatherhead height and clearances', checked: false, critical: false },
         { id: 8, item: 'Check coordination with FPL for service connection', checked: false, critical: false }
+      ],
+      'Electrical - Temporary Service': [
+        { id: 1, item: 'Verify temporary service pole meets code requirements', checked: false, critical: true },
+        { id: 2, item: 'Check proper grounding of temporary service', checked: false, critical: true },
+        { id: 3, item: 'Confirm weatherproof enclosure for temporary panel', checked: false, critical: true },
+        { id: 4, item: 'Verify GFCI protection on all temporary outlets', checked: false, critical: true }
       ]
     };
 
@@ -106,6 +182,116 @@ const App = () => {
     if (attempts >= 2) return { level: 'critical', message: 'CRITICAL: Next failure = 4x fee ($500+ fine possible)' };
     return null;
   };
+
+  const ProjectDetailsModal = ({ project, onClose }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center">
+          <h2 className="text-2xl font-bold">{project.projectName}</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">Status</div>
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(project.status, project.attempts)}`}>
+                {project.status}
+              </span>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">Attempts</div>
+              <div className="text-lg font-bold">#{project.attempts + 1}</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm font-semibold text-gray-600 mb-1">Address</div>
+            <div>{project.address}</div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">Permit Number</div>
+              <div>{project.permitNumber}</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">Inspection Type</div>
+              <div>{project.inspectionType}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">Contact Name</div>
+              <div>{project.contactName}</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">Contact Phone</div>
+              <div>{project.contactPhone}</div>
+            </div>
+          </div>
+
+          {project.scheduledDate && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-sm font-semibold text-gray-600 mb-1">Scheduled Date</div>
+                <div>{project.scheduledDate}</div>
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-gray-600 mb-1">Scheduled Time</div>
+                <div>{project.scheduledTime}</div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">HVHZ Zone</div>
+              <div>{project.hvhzZone ? '✅ Yes' : '❌ No'}</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-gray-600 mb-1">Flood Zone</div>
+              <div>{project.floodZone ? '✅ Yes' : '❌ No'}</div>
+            </div>
+          </div>
+
+          {project.failureReasons && (
+            <div className="bg-red-50 p-4 rounded border border-red-200">
+              <div className="font-semibold text-red-800 mb-2">Failure Reasons:</div>
+              <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                {project.failureReasons.map((reason, idx) => (
+                  <li key={idx}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {getPenaltyWarning(project.attempts) && (
+            <div className={`p-4 rounded ${getPenaltyWarning(project.attempts).level === 'critical' ? 'bg-red-100 border border-red-300' : 'bg-orange-100 border border-orange-300'}`}>
+              <div className="flex items-center gap-2">
+                <AlertCircle className={`h-5 w-5 ${getPenaltyWarning(project.attempts).level === 'critical' ? 'text-red-600' : 'text-orange-600'}`} />
+                <span className={`font-semibold ${getPenaltyWarning(project.attempts).level === 'critical' ? 'text-red-800' : 'text-orange-800'}`}>
+                  {getPenaltyWarning(project.attempts).message}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-gray-50 border-t p-6">
+          <button
+            onClick={onClose}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   const DashboardView = () => (
     <div className="space-y-6">
@@ -197,7 +383,10 @@ const App = () => {
                       </div>
                     )}
                   </div>
-                  <button className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium">
+                  <button 
+                    onClick={() => setSelectedProject(project)}
+                    className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+                  >
                     View Details
                   </button>
                 </div>
@@ -211,6 +400,18 @@ const App = () => {
 
   const NewInspectionView = () => (
     <div className="max-w-4xl mx-auto">
+      {showSuccessMessage && (
+        <div className="mb-6 bg-green-50 border-2 border-green-500 rounded-lg p-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <CheckSquare className="h-6 w-6 text-green-600" />
+            <div>
+              <div className="font-bold text-green-800">Inspection Scheduled Successfully!</div>
+              <div className="text-sm text-green-700">Redirecting to dashboard...</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-8">
         <h2 className="text-2xl font-bold mb-6">Schedule New Electrical Inspection</h2>
         
@@ -327,15 +528,16 @@ const App = () => {
 
           <div className="flex gap-4">
             <button
-              onClick={() => {
-                generateElectricalChecklist(newInspection.inspectionType);
-              }}
+              onClick={() => generateElectricalChecklist(newInspection.inspectionType)}
               className="flex-1 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2"
             >
               <CheckSquare className="h-5 w-5" />
               Generate Pre-Inspection Checklist
             </button>
-            <button className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+            <button 
+              onClick={handleScheduleInspection}
+              className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+            >
               Schedule Inspection
             </button>
           </div>
@@ -415,23 +617,71 @@ const App = () => {
           <h2 className="text-xl font-bold">Inspection Documents & Photos</h2>
         </div>
         <div className="p-6">
-          <div className="grid grid-cols-3 gap-6">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer">
+          <div className="grid grid-cols-3 gap-6 mb-6">
+            <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer transition">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => handleFileUpload(e, 'photo')}
+                className="hidden"
+              />
               <Camera className="h-12 w-12 mx-auto text-gray-400 mb-3" />
               <div className="font-semibold mb-1">Upload Site Photos</div>
               <div className="text-sm text-gray-500">GPS & timestamp automatic</div>
-            </div>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer">
+            </label>
+            <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer transition">
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => handleFileUpload(e, 'noa')}
+                className="hidden"
+              />
               <FileText className="h-12 w-12 mx-auto text-gray-400 mb-3" />
               <div className="font-semibold mb-1">Upload NOA Docs</div>
               <div className="text-sm text-gray-500">Miami-Dade approvals</div>
-            </div>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer">
+            </label>
+            <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 cursor-pointer transition">
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.dwg"
+                onChange={(e) => handleFileUpload(e, 'plans')}
+                className="hidden"
+              />
               <FileText className="h-12 w-12 mx-auto text-gray-400 mb-3" />
               <div className="font-semibold mb-1">Upload Plans</div>
               <div className="text-sm text-gray-500">Approved electrical plans</div>
-            </div>
+            </label>
           </div>
+
+          {uploadedFiles.length > 0 && (
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h3 className="font-bold text-lg mb-4">Uploaded Files ({uploadedFiles.length})</h3>
+              <div className="space-y-2">
+                {uploadedFiles.map(file => (
+                  <div key={file.id} className="flex items-center justify-between bg-white p-3 rounded border">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      <div>
+                        <div className="font-medium">{file.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {file.type.toUpperCase()} • {(file.size / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setUploadedFiles(uploadedFiles.filter(f => f.id !== file.id))}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -474,6 +724,13 @@ const App = () => {
         {activeTab === 'new' && <NewInspectionView />}
         {activeTab === 'documents' && <DocumentsView />}
       </div>
+
+      {selectedProject && (
+        <ProjectDetailsModal 
+          project={selectedProject} 
+          onClose={() => setSelectedProject(null)} 
+        />
+      )}
     </div>
   );
 };
